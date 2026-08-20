@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .badge-paid {
+    @apply bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold px-2.5 py-1 rounded-full text-xs inline-flex items-center gap-1;
+  }
+  .badge-pending {
+    @apply bg-amber-100 text-amber-800 border border-amber-200 font-semibold px-2.5 py-1 rounded-full text-xs inline-flex items-center gap-1;
+  }
+  .badge-overdue {
+    @apply bg-rose-100 text-rose-800 border border-rose-200 font-semibold px-2.5 py-1 rounded-full text-xs inline-flex items-center gap-1;
+  }
+  .badge-draft {
+    @apply bg-slate-100 text-slate-700 border border-slate-200 font-semibold px-2.5 py-1 rounded-full text-xs inline-flex items-center gap-1;
+  }
+}
