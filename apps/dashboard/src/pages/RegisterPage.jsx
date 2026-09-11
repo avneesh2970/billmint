@@ -30,14 +30,17 @@ export default function RegisterPage() {
 
     try {
       const res = await apiRequest('/auth/register', 'POST', form);
-      if (res.token) {
+      if (res && res.token) {
         localStorage.setItem('billmint_token', res.token);
+        localStorage.setItem('billmint_user', JSON.stringify(res.user || { email: form.email, fullName: form.fullName }));
+        // Always go to onboarding first — never skip setup
+        localStorage.removeItem('billmint_onboarded');
+        navigate('/onboarding');
+      } else {
+        setError('Failed to create account. Please check inputs.');
       }
-      navigate('/onboarding');
     } catch (err) {
-      // Fallback for seamless demo
-      localStorage.setItem('billmint_token', 'demo_jwt_token_2026');
-      navigate('/onboarding');
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }

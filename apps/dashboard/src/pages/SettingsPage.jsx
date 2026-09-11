@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building, FileText, CreditCard, User, Shield, 
-  Sparkles, CheckCircle2, Save, ArrowUpRight 
+  Sparkles, CheckCircle2, Save 
 } from 'lucide-react';
 import { apiRequest } from '../services/api';
 import { getStateCodeFromState, parseGSTIN } from '../../../../packages/shared-utils/index.js';
@@ -11,29 +11,39 @@ export default function SettingsPage({ business = {}, onUpdateBusiness }) {
   const [activeTab, setActiveTab] = useState('business');
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  const [form, setForm] = useState({
-    name: business.name || 'Nova Creative Studio',
-    businessType: business.businessType || 'Agency / Service Provider',
-    email: business.email || 'billing@novacreative.in',
-    phone: business.phone || '+91 98765 43210',
-    website: business.website || 'https://novacreative.in',
-    address: business.address || 'Suite 402, Mint Heights, Cyber City',
-    city: business.city || 'Bengaluru',
-    state: business.state || 'Karnataka',
-    stateCode: business.stateCode || getStateCodeFromState(business.state || 'Karnataka') || '29',
-    pincode: business.pincode || '560100',
-    gstin: business.gstin || '29ABCDE1234F1ZH',
-    pan: business.pan || 'ABCDE1234F',
-    invoicePrefix: business.invoicePrefix || 'INV-2026-',
-    defaultTaxRate: business.defaultTaxRate || 18,
-    bankName: business.bankDetails?.bankName || 'HDFC Bank',
-    accountName: business.bankDetails?.accountName || 'Nova Creative Studio Pvt Ltd',
-    accountNumber: business.bankDetails?.accountNumber || '50200012345678',
-    ifsc: business.bankDetails?.ifsc || 'HDFC0001234',
-    upiId: business.bankDetails?.upiId || 'novacreative@hdfcbank',
-    defaultTerms: business.defaultTerms || 'Payment due within 15 days.',
-    defaultNotes: business.defaultNotes || 'Thank you for your business!'
+  const buildForm = (b = {}) => ({
+    name: b.name || '',
+    businessType: b.businessType || '',
+    email: b.email || '',
+    phone: b.phone || '',
+    website: b.website || '',
+    address: b.address || '',
+    city: b.city || '',
+    state: b.state || '',
+    stateCode: b.stateCode || getStateCodeFromState(b.state || '') || '',
+    pincode: b.pincode || '',
+    gstin: b.gstin || '',
+    pan: b.pan || '',
+    invoicePrefix: b.invoicePrefix || 'INV-2026-',
+    nextInvoiceNumber: b.nextInvoiceNumber || 1,
+    defaultTaxRate: b.defaultTaxRate || 18,
+    bankName: b.bankDetails?.bankName || '',
+    accountName: b.bankDetails?.accountName || '',
+    accountNumber: b.bankDetails?.accountNumber || '',
+    ifsc: b.bankDetails?.ifsc || '',
+    upiId: b.bankDetails?.upiId || '',
+    defaultTerms: b.defaultTerms || 'Payment due within 15 days.',
+    defaultNotes: b.defaultNotes || 'Thank you for your business!'
   });
+
+  const [form, setForm] = useState(() => buildForm(business));
+
+  // Sync form whenever business prop loads/updates from API
+  useEffect(() => {
+    if (business && Object.keys(business).length > 0) {
+      setForm(buildForm(business));
+    }
+  }, [business]);
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -179,27 +189,56 @@ export default function SettingsPage({ business = {}, onUpdateBusiness }) {
           {/* Invoice Defaults */}
           {activeTab === 'invoice' && (
             <div className="space-y-4">
-              <h3 className="text-base font-bold text-slate-900 pb-2 border-b border-slate-100">Invoice Defaults & Terms</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <h3 className="text-base font-bold text-slate-900 pb-2 border-b border-slate-100">Invoice Prefix, Sequential Numbering & Defaults</h3>
+              
+              {/* Live Preview Box */}
+              <div className="bg-gradient-to-r from-mint-500/10 via-emerald-500/5 to-transparent p-4 rounded-2xl border border-mint-200 flex items-center justify-between">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Invoice Prefix</label>
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Live Format Preview</span>
+                  <div className="text-lg font-black font-mono text-slate-900 mt-0.5">
+                    {form.invoicePrefix || 'INV-2026-'}{String(form.nextInvoiceNumber || 1).padStart(3, '0')}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Next generated invoice will automatically use this sequence format.</p>
+                </div>
+                <span className="px-3 py-1 bg-mint-600 text-white font-extrabold text-xs rounded-full shadow-xs">
+                  Active Sequence
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Invoice Prefix / Format</label>
                   <input 
                     type="text" 
+                    placeholder="e.g. NN/IN/ or INV-2026-"
                     value={form.invoicePrefix}
                     onChange={(e) => setForm({ ...form, invoicePrefix: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono" 
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-slate-900 font-bold" 
                   />
                 </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Next Sequence Number</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    value={form.nextInvoiceNumber}
+                    onChange={(e) => setForm({ ...form, nextInvoiceNumber: parseInt(e.target.value, 10) || 1 })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-slate-900 font-bold" 
+                  />
+                </div>
+
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Default GST Rate (%)</label>
                   <input 
                     type="number" 
                     value={form.defaultTaxRate}
                     onChange={(e) => setForm({ ...form, defaultTaxRate: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl" 
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-bold" 
                   />
                 </div>
-                <div className="sm:col-span-2">
+
+                <div className="sm:col-span-3">
                   <label className="block font-bold text-slate-700 mb-1">Default Terms & Conditions</label>
                   <textarea 
                     rows="3"

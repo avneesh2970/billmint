@@ -4,17 +4,23 @@ import { Shield, Lock, ArrowRight, FileText } from 'lucide-react';
 
 export default function AdminLoginPage({ onAdminLogin }) {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@billmint.com');
-  const [password, setPassword] = useState('Admin@123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (email === 'admin@billmint.com' && password === 'Admin@123') {
+    const envEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@billmint.com';
+    const envPass = import.meta.env.VITE_ADMIN_PASSWORD || 'SuperAdmin@BillMint2026';
+
+    if (email.trim() === envEmail.trim() && password === envPass) {
+      const adminToken = `admin_session_${Date.now()}`;
+      localStorage.setItem('billmint_admin_token', adminToken);
+      localStorage.setItem('billmint_admin_user', JSON.stringify({ email, role: 'SUPER_ADMIN' }));
       onAdminLogin({ id: 'admin_1', email, role: 'SUPER_ADMIN' });
       navigate('/admin');
     } else {
-      setError('Invalid admin credentials');
+      setError('Invalid admin credentials. Please enter valid admin email and password from .env.');
     }
   };
 

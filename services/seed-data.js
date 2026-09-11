@@ -1,5 +1,5 @@
 import { resetStoreToDemo } from './db-store.js';
 
-console.log('🌱 Seeding BillMint Database Store with Demo Data...');
+console.log('🧹 Initializing Clean Production Database Store...');
 resetStoreToDemo();
-console.log('✅ Seeding complete! Demo business Nova Creative Studio and invoices populated.');
+console.log('✅ Initialization complete! Database store ready for live operations.');

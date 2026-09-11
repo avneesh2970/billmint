@@ -1,12 +1,8 @@
 import React from 'react';
 import { Building, CheckCircle2 } from 'lucide-react';
 
-export default function BusinessManagement() {
-  const businesses = [
-    { id: 'bus_1', name: 'Nova Creative Studio', owner: 'Nova Creative Owner', gstin: '29ABCDE1234F1ZH', plan: 'Pro', status: 'Active', city: 'Bengaluru' },
-    { id: 'bus_2', name: 'ABC Enterprises Pvt. Ltd.', owner: 'Rahul Sharma', gstin: '07AAACA1234B1ZB', plan: 'Business', status: 'Active', city: 'Noida' },
-    { id: 'bus_3', name: 'Apex Digital Solutions', owner: 'Vikram Sengupta', gstin: '19AACCA9876D1ZF', plan: 'Free', status: 'Active', city: 'Kolkata' }
-  ];
+export default function BusinessManagement({ businesses = [] }) {
+  const safeBusinesses = Array.isArray(businesses) ? businesses : [];
 
   return (
     <div className="space-y-6 pb-12">
@@ -31,20 +27,28 @@ export default function BusinessManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {businesses.map(b => (
-                <tr key={b.id} className="hover:bg-slate-850">
-                  <td className="py-4 px-6 font-bold text-white">{b.name}</td>
-                  <td className="py-4 px-6 text-slate-300">{b.owner}</td>
-                  <td className="py-4 px-6 font-mono text-xs text-slate-400">{b.gstin}</td>
-                  <td className="py-4 px-6 text-slate-400">{b.city}</td>
-                  <td className="py-4 px-6 text-center font-bold text-mint-400">{b.plan}</td>
-                  <td className="py-4 px-6 text-center">
-                    <span className="bg-emerald-950 text-emerald-400 border border-emerald-800 px-2.5 py-1 rounded-full text-xs font-bold">
-                      {b.status}
-                    </span>
+              {safeBusinesses.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-8 text-center text-xs text-slate-500">
+                    No registered business profiles found.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                safeBusinesses.map(b => (
+                  <tr key={b.id} className="hover:bg-slate-850">
+                    <td className="py-4 px-6 font-bold text-white">{b.name}</td>
+                    <td className="py-4 px-6 text-slate-300">{b.owner}</td>
+                    <td className="py-4 px-6 font-mono text-xs text-slate-400">{b.gstin}</td>
+                    <td className="py-4 px-6 text-slate-400">{b.city}</td>
+                    <td className="py-4 px-6 text-center font-bold text-mint-400">{b.plan}</td>
+                    <td className="py-4 px-6 text-center">
+                      <span className="bg-emerald-950 text-emerald-400 border border-emerald-800 px-2.5 py-1 rounded-full text-xs font-bold">
+                        {b.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

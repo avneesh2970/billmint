@@ -5,8 +5,8 @@ import { apiRequest } from '../services/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('demo@billmint.com');
-  const [password, setPassword] = useState('Demo@123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,14 +18,15 @@ export default function LoginPage() {
 
     try {
       const res = await apiRequest('/auth/login', 'POST', { email, password });
-      if (res.token) {
+      if (res && res.token) {
         localStorage.setItem('billmint_token', res.token);
+        localStorage.setItem('billmint_user', JSON.stringify(res.user || { email }));
+        navigate('/dashboard');
+      } else {
+        setError('Login failed. No session token returned from server.');
       }
-      navigate('/dashboard');
     } catch (err) {
-      // Demo fallback
-      localStorage.setItem('billmint_token', 'demo_jwt_token_2026');
-      navigate('/dashboard');
+      setError(err.message || 'Invalid email or password. Please try again.');
     } finally {
       setLoading(false);
     }

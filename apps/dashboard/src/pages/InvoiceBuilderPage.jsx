@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Save, Eye, ArrowLeft, Building2, UserPlus, FileText, MapPin, CheckCircle2, AlertCircle, Edit2 } from 'lucide-react';
-import { formatCurrency, calculateInvoiceSummary, checkIsInterState, getStateCodeFromState } from '../../../../packages/shared-utils/index.js';
+import { formatCurrency, calculateInvoiceSummary, checkIsInterState, getStateCodeFromState, generateNextInvoiceNumber } from '../../../../packages/shared-utils/index.js';
 import AddressStepForm from '../components/AddressStepForm.jsx';
 
-export default function InvoiceBuilderPage({ business = {}, customers = [], products = [], onSaveInvoice }) {
+export default function InvoiceBuilderPage({ business = {}, customers = [], products = [], invoices = [], onSaveInvoice }) {
   const navigate = useNavigate();
 
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
-  const [invoiceNumber, setInvoiceNumber] = useState(`INV-2026-00${Math.floor(10 + Math.random() * 90)}`);
+  const [invoiceNumber, setInvoiceNumber] = useState(() => generateNextInvoiceNumber(business, invoices));
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState(new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0]);
   const [template, setTemplate] = useState('Modern');
@@ -49,17 +49,17 @@ export default function InvoiceBuilderPage({ business = {}, customers = [], prod
   const [items, setItems] = useState([
     {
       id: `item_${Date.now()}`,
-      description: 'Website Development',
+      description: '',
       hsnSac: '998314',
       quantity: 1,
-      rate: 75000,
+      rate: 0,
       discountPercent: 0,
-      taxRate: 18
+      taxRate: Number(business?.defaultTaxRate) || 18
     }
   ]);
 
   const [notes, setNotes] = useState(business?.defaultNotes || 'Thank you for your business!');
-  const [terms, setTerms] = useState(business?.defaultTerms || 'Payment due within 15 days.');
+  const [terms, setTerms] = useState(business?.defaultTerms || '1. Payment due within 15 days of invoice date.\n2. Please quote invoice number when remitting payment.');
 
   const addItem = () => {
     setItems([
@@ -111,7 +111,7 @@ export default function InvoiceBuilderPage({ business = {}, customers = [], prod
       id: `inv_${Date.now()}`,
       invoiceNumber,
       customerId: selectedCust.id || 'cust_001',
-      customerName: selectedCust.company || selectedCust.name || 'ABC Enterprises',
+      customerName: selectedCust.company || selectedCust.name || 'Valued Customer',
       customerEmail: selectedCust.email || '',
       customerAddress: fullCustAddr || selectedCust.address || '',
       customerCity: custAddress.city,
@@ -187,15 +187,45 @@ export default function InvoiceBuilderPage({ business = {}, customers = [], prod
 
       <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xl p-6 sm:p-10 space-y-8">
         
-        {/* Section 1: Business Header & Invoice Number */}
+        {/* Section 1: Business Header & Invoice Number & Template */}
         <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-100 pb-8">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-mint-600 bg-mint-50 px-3 py-1 rounded-full">
-              Billed From (Seller)
+          <div className="space-y-1.5 max-w-md">
+            <span className="text-xs font-bold uppercase tracking-wider text-mint-700 bg-mint-50 px-3 py-1 rounded-full inline-block">
+              Billed From (Seller Workspace)
             </span>
-            <h2 className="text-xl font-bold text-charcoal-900 mt-2">{business?.name || 'Nova Creative Studio'}</h2>
-            <p className="text-xs text-slate-500">{business?.address}, {business?.city}, {bizState} (State Code: {bizCode})</p>
-            <p className="text-xs text-slate-500">GSTIN: {business?.gstin} | Phone: {business?.phone}</p>
+            <h2 className="text-xl font-bold text-charcoal-900 mt-1">{business?.name || 'My Business'}</h2>
+            <p className="text-xs text-slate-500">
+              {[business?.address, business?.city, bizState ? `${bizState}${bizCode ? ` (${bizCode})` : ''}` : '', business?.pincode].filter(Boolean).join(', ') || 'Business address not set (configured in Settings)'}
+            </p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 font-mono pt-0.5">
+              {business?.gstin && <span className="font-bold text-slate-700">GSTIN: {business.gstin}</span>}
+              {business?.pan && <span className="font-bold text-slate-700">PAN: {business.pan}</span>}
+              {business?.phone && <span className="text-slate-600 font-sans">Phone: {business.phone}</span>}
+            </div>
+
+            {/* Template Selector */}
+            <div className="pt-3">
+              <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1.5">Invoice Design Template</label>
+              <div className="flex flex-wrap gap-1.5 bg-slate-100 p-1 rounded-xl w-fit">
+                {[
+                  { id: 'Modern', label: 'Modern Pro' },
+                  { id: 'Classic', label: 'Classic Corporate' },
+                  { id: 'Minimal', label: 'Clean Minimal' },
+                  { id: 'GST Pro', label: 'GST Tax Invoice' }
+                ].map(t => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTemplate(t.id)}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                      template === t.id ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="w-full sm:w-64 space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">

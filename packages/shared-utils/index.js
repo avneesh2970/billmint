@@ -210,3 +210,100 @@ export function formatDate(dateString) {
   });
 }
 
+/**
+ * Generates the next sequential invoice number based on business prefix and existing invoices.
+ * e.g., if prefix is "NN/IN/" and next number is 4, returns "NN/IN/004".
+ * If prefix is "INV-2026-" and existing invoices have "INV-2026-003", returns "INV-2026-004".
+ */
+export function generateNextInvoiceNumber(business = {}, invoices = []) {
+  const prefix = business?.invoicePrefix || 'INV-2026-';
+
+  // Find max sequence number from existing invoices
+  let maxSeq = 0;
+  if (Array.isArray(invoices)) {
+    invoices.forEach(inv => {
+      if (inv && inv.invoiceNumber) {
+        const match = inv.invoiceNumber.match(/(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxSeq) {
+            maxSeq = num;
+          }
+        }
+      }
+    });
+  }
+
+  const nextNumFromBiz = Number(business?.nextInvoiceNumber) || 1;
+  const seq = Math.max(maxSeq + 1, nextNumFromBiz);
+
+  // Format with minimum 3-digit zero padding
+  const paddedNum = String(seq).padStart(3, '0');
+
+  return `${prefix}${paddedNum}`;
+}
+
+/**
+ * Converts a number to words in Indian numbering system
+ * e.g., 29500 -> "Indian Rupees Twenty Nine Thousand Five Hundred Only"
+ */
+export function amountToWords(amount) {
+  const num = Math.round(Number(amount) * 100) / 100;
+  if (isNaN(num) || num === 0) return 'Indian Rupees Zero Only';
+
+  const singleDigits = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+  const twoDigits = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tensMultiple = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function convertTwoDigits(n) {
+    if (n === 0) return '';
+    if (n < 10) return singleDigits[n];
+    if (n >= 10 && n < 20) return twoDigits[n - 10];
+    const tens = tensMultiple[Math.floor(n / 10)];
+    const units = singleDigits[n % 10];
+    return units ? `${tens} ${units}` : tens;
+  }
+
+  function convertThreeDigits(n) {
+    const hundreds = Math.floor(n / 100);
+    const remainder = n % 100;
+    let res = '';
+    if (hundreds > 0) {
+      res += `${singleDigits[hundreds]} Hundred`;
+      if (remainder > 0) res += ' ';
+    }
+    if (remainder > 0) {
+      res += convertTwoDigits(remainder);
+    }
+    return res;
+  }
+
+  const [rupeesStr, paiseStr] = num.toFixed(2).split('.');
+  let rupees = parseInt(rupeesStr, 10);
+  const paise = parseInt(paiseStr, 10);
+
+  let words = '';
+
+  const crore = Math.floor(rupees / 10000000);
+  rupees %= 10000000;
+  const lakh = Math.floor(rupees / 100000);
+  rupees %= 100000;
+  const thousand = Math.floor(rupees / 1000);
+  rupees %= 1000;
+  const remainder = rupees;
+
+  if (crore > 0) words += `${convertTwoDigits(crore)} Crore `;
+  if (lakh > 0) words += `${convertTwoDigits(lakh)} Lakh `;
+  if (thousand > 0) words += `${convertTwoDigits(thousand)} Thousand `;
+  if (remainder > 0) words += `${convertThreeDigits(remainder)} `;
+
+  words = words.trim();
+  let result = words ? `Indian Rupees ${words}` : 'Indian Rupees Zero';
+
+  if (paise > 0) {
+    result += ` and ${convertTwoDigits(paise)} Paise`;
+  }
+  result += ' Only';
+
+  return result;
+}

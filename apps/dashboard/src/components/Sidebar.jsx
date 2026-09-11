@@ -5,7 +5,7 @@ import {
   BarChart3, RefreshCw, Settings, HelpCircle, LogOut, ShoppingBag, Building2 
 } from 'lucide-react';
 
-export default function Sidebar({ mobileOpen, setMobileOpen }) {
+export default function Sidebar({ mobileOpen, setMobileOpen, business = {} }) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -93,10 +93,10 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
           {/* Active Business Badge */}
           <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/50 flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-mint-950 text-mint-400 border border-mint-800 flex items-center justify-center font-bold text-xs">
-              NC
+              {(business?.name || 'My Business').slice(0, 2).toUpperCase()}
             </div>
             <div className="truncate text-xs">
-              <p className="font-bold text-white truncate">Nova Creative Studio</p>
+              <p className="font-bold text-white truncate">{business?.name || 'My Business'}</p>
               <p className="text-[10px] text-emerald-400 font-medium">Pro Subscription</p>
             </div>
           </div>

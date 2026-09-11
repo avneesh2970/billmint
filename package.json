@@ -8,6 +8,7 @@
     "services/*",
     "packages/*"
   ],
+  "type": "module",
   "scripts": {
     "dev": "concurrently -k -p \"[{name}]\" -c \"cyan,emerald,blue,yellow,magenta,green\" \"npm run dev:gateway\" \"npm run dev:auth\" \"npm run dev:web\" \"npm run dev:dashboard\" \"npm run dev:admin\"",
     "dev:gateway": "node services/api-gateway/index.js",
@@ -18,7 +19,8 @@
     "dev:admin": "npm --prefix apps/admin run dev",
     "build": "npm run build:apps",
     "build:apps": "npm --prefix apps/web run build && npm --prefix apps/dashboard run build && npm --prefix apps/admin run build",
-    "seed": "node services/seed-data.js"
+    "seed": "node services/seed-data.js",
+    "test": "node --test services/tests/auth-and-dashboard.test.js apps/dashboard/src/tests/dashboard-logic.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

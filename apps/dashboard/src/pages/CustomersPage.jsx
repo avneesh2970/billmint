@@ -4,7 +4,7 @@ import { Plus, Search, Users, Edit3, Trash2, Building, Mail, Phone, MapPin, Rece
 import { formatCurrency, parseGSTIN, getStateCodeFromState, getStateFromStateCode } from '../../../../packages/shared-utils/index.js';
 import AddressStepForm from '../components/AddressStepForm.jsx';
 
-export default function CustomersPage({ customers = [], invoices = [], onAddCustomer, onDeleteCustomer }) {
+export default function CustomersPage({ customers = [], invoices = [], onAddCustomer, onDeleteCustomer, onRecordPayment }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCustomerForHistory, setSelectedCustomerForHistory] = useState(null);
@@ -219,39 +219,63 @@ export default function CustomersPage({ customers = [], invoices = [], onAddCust
                           <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                             <tr>
                               <th className="py-2.5 px-4">Invoice #</th>
-                              <th className="py-2.5 px-4">Issue Date</th>
-                              <th className="py-2.5 px-4">Due Date</th>
-                              <th className="py-2.5 px-4 text-right">Amount</th>
-                              <th className="py-2.5 px-4 text-center">Status</th>
-                              <th className="py-2.5 px-4 text-right">Action</th>
+                              <th className="py-2.5 px-3">Date</th>
+                              <th className="py-2.5 px-3 text-right">Total</th>
+                              <th className="py-2.5 px-3 text-right">Paid</th>
+                              <th className="py-2.5 px-3 text-right">Pending</th>
+                              <th className="py-2.5 px-3 text-center">Status</th>
+                              <th className="py-2.5 px-4 text-right">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {cInvoices.map(inv => (
-                              <tr key={inv.id} className="hover:bg-slate-50">
-                                <td className="py-3 px-4 font-bold text-slate-900">{inv.invoiceNumber}</td>
-                                <td className="py-3 px-4 text-slate-500">{inv.issueDate}</td>
-                                <td className="py-3 px-4 text-slate-500">{inv.dueDate}</td>
-                                <td className="py-3 px-4 text-right font-bold text-slate-900">{formatCurrency(inv.grandTotal)}</td>
-                                <td className="py-3 px-4 text-center">
-                                  <span className={
-                                    inv.status === 'Paid' ? 'badge-paid' :
-                                    inv.status === 'Pending' ? 'badge-pending' :
-                                    inv.status === 'Overdue' ? 'badge-overdue' : 'badge-draft'
-                                  }>
-                                    {inv.status}
-                                  </span>
-                                </td>
-                                <td className="py-3 px-4 text-right">
-                                  <button 
-                                    onClick={() => { setSelectedCustomerForHistory(null); navigate(`/invoices/${inv.id}`); }}
-                                    className="p-1 text-mint-600 font-bold hover:underline"
-                                  >
-                                    View →
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
+                            {cInvoices.map(inv => {
+                              const paidAmt = inv.status === 'Paid' ? Number(inv.grandTotal) : (Number(inv.amountPaid) || 0);
+                              const pendingAmt = inv.status === 'Paid' ? 0 : Math.max(0, Number(inv.grandTotal) - paidAmt);
+
+                              return (
+                                <tr key={inv.id} className="hover:bg-slate-50">
+                                  <td className="py-3 px-4 font-bold text-slate-900">{inv.invoiceNumber}</td>
+                                  <td className="py-3 px-3 text-slate-500">{inv.issueDate}</td>
+                                  <td className="py-3 px-3 text-right font-bold text-slate-900">{formatCurrency(inv.grandTotal)}</td>
+                                  <td className="py-3 px-3 text-right font-bold text-emerald-600">{formatCurrency(paidAmt)}</td>
+                                  <td className="py-3 px-3 text-right font-bold text-rose-600">{formatCurrency(pendingAmt)}</td>
+                                  <td className="py-3 px-3 text-center">
+                                    <span className={
+                                      inv.status === 'Paid' ? 'badge-paid' :
+                                      inv.status === 'Partially Paid' ? 'badge-pending' :
+                                      inv.status === 'Pending' ? 'badge-pending' :
+                                      inv.status === 'Overdue' ? 'badge-overdue' : 'badge-draft'
+                                    }>
+                                      {inv.status}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right whitespace-nowrap space-x-2">
+                                    {inv.status !== 'Paid' && onRecordPayment && (
+                                      <button
+                                        onClick={() => {
+                                          onRecordPayment({
+                                            invoiceId: inv.id,
+                                            amount: pendingAmt,
+                                            paymentMethod: 'UPI',
+                                            notes: `Settled via customer history drawer`
+                                          });
+                                        }}
+                                        className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg shadow-xs"
+                                        title="Mark 100% Paid"
+                                      >
+                                        Mark Paid
+                                      </button>
+                                    )}
+                                    <button 
+                                      onClick={() => { setSelectedCustomerForHistory(null); navigate(`/invoices/${inv.id}`); }}
+                                      className="p-1 text-mint-600 font-bold hover:underline"
+                                    >
+                                      View →
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -286,7 +310,7 @@ export default function CustomersPage({ customers = [], invoices = [], onAddCust
                   <input 
                     type="text" 
                     required
-                    placeholder="e.g. ABC Enterprises"
+                    placeholder="e.g. Acme Corporation"
                     value={newCust.company}
                     onChange={(e) => setNewCust({ ...newCust, company: e.target.value })}
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium"
@@ -297,7 +321,7 @@ export default function CustomersPage({ customers = [], invoices = [], onAddCust
                   <input 
                     type="text" 
                     required
-                    placeholder="e.g. Rahul Sharma"
+                    placeholder="e.g. John Doe"
                     value={newCust.name}
                     onChange={(e) => setNewCust({ ...newCust, name: e.target.value })}
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium"
