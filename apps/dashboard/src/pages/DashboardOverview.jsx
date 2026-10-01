@@ -30,9 +30,9 @@ export default function DashboardOverview({ invoices = [], business = {}, custom
   const pendingPct = grandTotalBilled > 0 ? Math.round((pendingAmount / grandTotalBilled) * 100) : 0;
   const overduePct = grandTotalBilled > 0 ? Math.round((overdueAmount / grandTotalBilled) * 100) : 0;
 
-  const handleDownloadPDF = (inv) => {
+  const handleDownloadPDF = async (inv) => {
     const cust = safeCustomers.find(c => c.id === inv.customerId);
-    const pdf = generateInvoicePDF(inv, business, cust, inv.template || 'Modern');
+    const pdf = await generateInvoicePDF(inv, business, cust, inv.template || 'Modern');
     pdf.save(`${inv.invoiceNumber || 'Invoice'}.pdf`);
   };
 

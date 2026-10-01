@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Plus, Search, Users, Edit3, Trash2, Building, Mail, Phone, MapPin, Receipt, X, Eye } from 'lucide-react';
+import { Plus, Search, Users, Edit3, Trash2, Building, Mail, Phone, MapPin, Receipt, X, Eye, Sparkles, Loader2, CheckCircle2 } from 'lucide-react';
 import { formatCurrency, parseGSTIN, getStateCodeFromState, getStateFromStateCode } from '../../../../packages/shared-utils/index.js';
+import { fetchGSTDetails } from '../services/gst';
 import AddressStepForm from '../components/AddressStepForm.jsx';
 
 export default function CustomersPage({ customers = [], invoices = [], onAddCustomer, onDeleteCustomer, onRecordPayment }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCustomerForHistory, setSelectedCustomerForHistory] = useState(null);
+  const [gstLoading, setGstLoading] = useState(false);
+  const [gstFeedback, setGstFeedback] = useState({ message: '', error: false });
   const navigate = useNavigate();
 
   const [newCust, setNewCust] = useState({
@@ -21,11 +24,55 @@ export default function CustomersPage({ customers = [], invoices = [], onAddCust
     c.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleCustomerGSTFetch = async (gstinVal) => {
+    const clean = (gstinVal || newCust.gstin || '').trim().toUpperCase();
+    if (clean.length !== 15) return;
+    setGstLoading(true);
+    setGstFeedback({ message: 'Fetching customer details from GST Portal...', error: false });
+    try {
+      const data = await fetchGSTDetails(clean);
+      if (data && data.success) {
+        setNewCust(prev => ({
+          ...prev,
+          gstin: clean,
+          company: data.tradeName || data.legalName || prev.company,
+          name: prev.name || (data.legalName ? data.legalName.split(' ')[0] : 'Client Contact'),
+          pan: data.pan || prev.pan,
+          address: data.address || prev.address,
+          city: data.city || prev.city,
+          state: data.state || prev.state,
+          stateCode: data.stateCode || prev.stateCode,
+          pincode: data.pincode || prev.pincode
+        }));
+        const hasLiveName = Boolean(data.tradeName || data.legalName);
+        if (hasLiveName) {
+          setGstFeedback({
+            message: `✓ Live Verified: ${data.tradeName || data.legalName} (${data.status})`,
+            error: false
+          });
+        } else {
+          setGstFeedback({
+            message: `✓ State (${data.state}) & PAN verified. Enter client name & street address below.`,
+            error: false
+          });
+        }
+        setTimeout(() => setGstFeedback({ message: '', error: false }), 8000);
+      } else {
+        setGstFeedback({ message: data?.message || 'GSTIN details not found', error: true });
+      }
+    } catch (err) {
+      setGstFeedback({ message: err.message || 'Could not fetch GST details', error: true });
+    } finally {
+      setGstLoading(false);
+    }
+  };
+
   const handleCreate = (e) => {
     e.preventDefault();
     onAddCustomer({ id: `cust_${Date.now()}`, ...newCust });
     setShowAddModal(false);
     setNewCust({ name: '', company: '', email: '', phone: '', address: '', city: '', state: '', gstin: '', pan: '', notes: '' });
+    setGstFeedback({ message: '', error: false });
   };
 
   return (
@@ -350,36 +397,76 @@ export default function CustomersPage({ customers = [], invoices = [], onAddCust
                 </div>
               </div>
 
-              {/* GSTIN & PAN */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">GSTIN Number (Optional)</label>
-                  <input 
-                    type="text" 
-                    placeholder="07AAACA1234B1ZB"
-                    value={newCust.gstin}
-                    onChange={(e) => {
-                      const val = e.target.value.toUpperCase();
-                      const parsed = parseGSTIN(val);
-                      setNewCust(prev => ({
-                        ...prev,
-                        gstin: val,
-                        ...(parsed.stateCode ? { stateCode: parsed.stateCode, state: parsed.state } : {})
-                      }));
-                    }}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 bg-white rounded-xl uppercase font-mono text-xs font-bold"
-                  />
+              {/* GSTIN with Auto-Fetch */}
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <label className="block font-bold text-slate-800">
+                    GSTIN Number (Optional)
+                  </label>
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    Enter 15-character GSTIN to auto-fetch client details & address
+                  </span>
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">PAN Number (Optional)</label>
-                  <input 
-                    type="text" 
-                    placeholder="AAACA1234B"
-                    value={newCust.pan}
-                    onChange={(e) => setNewCust({ ...newCust, pan: e.target.value.toUpperCase() })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 bg-white rounded-xl uppercase font-mono text-xs font-bold"
-                  />
+
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input 
+                      type="text" 
+                      placeholder="e.g. 07AAACA1234B1ZB"
+                      maxLength={15}
+                      value={newCust.gstin}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '');
+                        const parsed = parseGSTIN(val);
+                        setNewCust(prev => ({
+                          ...prev,
+                          gstin: val,
+                          ...(parsed.stateCode ? { stateCode: parsed.stateCode, state: parsed.state } : {})
+                        }));
+                        if (val.length === 15) {
+                          handleCustomerGSTFetch(val);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl uppercase font-mono text-xs font-bold text-slate-900 bg-white tracking-wider focus:ring-2 focus:ring-mint-500 focus:outline-none"
+                    />
+                    {gstLoading && (
+                      <div className="absolute right-2.5 top-2.5 text-mint-600 animate-spin">
+                        <Loader2 className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCustomerGSTFetch(newCust.gstin)}
+                    disabled={gstLoading || newCust.gstin.length !== 15}
+                    className="px-3 py-2 bg-mint-600 hover:bg-mint-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all shrink-0"
+                  >
+                    {gstLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                    <span>Auto-fetch</span>
+                  </button>
                 </div>
+
+                {gstFeedback.message && (
+                  <div className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 ${
+                    gstFeedback.error ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                  }`}>
+                    {!gstFeedback.error && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                    <span>{gstFeedback.message}</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">PAN Number (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. AAACA1234B"
+                  maxLength={10}
+                  value={newCust.pan}
+                  onChange={(e) => setNewCust({ ...newCust, pan: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '') })}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono uppercase font-bold text-slate-900" 
+                />
               </div>
 
               {/* Multi-step Address Section */}

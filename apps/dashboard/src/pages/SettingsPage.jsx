@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Building, FileText, CreditCard, User, Shield, 
-  Sparkles, CheckCircle2, Save 
+  Sparkles, CheckCircle2, Save, Loader2 
 } from 'lucide-react';
 import { apiRequest } from '../services/api';
+import { fetchGSTDetails } from '../services/gst';
 import { getStateCodeFromState, parseGSTIN } from '../../../../packages/shared-utils/index.js';
 import AddressStepForm from '../components/AddressStepForm.jsx';
 
 export default function SettingsPage({ business = {}, onUpdateBusiness }) {
   const [activeTab, setActiveTab] = useState('business');
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [gstLoading, setGstLoading] = useState(false);
+  const [gstFeedback, setGstFeedback] = useState({ message: '', error: false });
 
   const buildForm = (b = {}) => ({
     name: b.name || '',
@@ -44,6 +47,70 @@ export default function SettingsPage({ business = {}, onUpdateBusiness }) {
       setForm(buildForm(business));
     }
   }, [business]);
+
+  const handleGSTFetch = async (gstinVal) => {
+    const clean = (gstinVal || form.gstin || '').trim().toUpperCase();
+    if (clean.length !== 15) return;
+    setGstLoading(true);
+    setGstFeedback({ message: 'Fetching verified details from GST Portal...', error: false });
+
+    try {
+      const data = await fetchGSTDetails(clean);
+      if (data && data.success) {
+        setForm(prev => ({
+          ...prev,
+          gstin: clean,
+          name: data.tradeName || data.legalName || prev.name,
+          businessType: data.constitution || prev.businessType,
+          pan: data.pan || prev.pan,
+          address: data.address || prev.address,
+          city: data.city || prev.city,
+          state: data.state || prev.state,
+          stateCode: data.stateCode || prev.stateCode,
+          pincode: data.pincode || prev.pincode
+        }));
+        const hasLiveName = Boolean(data.tradeName || data.legalName);
+        const hasLiveAddress = Boolean(data.address);
+
+        setForm(prev => ({
+          ...prev,
+          gstin: clean,
+          name: data.tradeName || data.legalName || prev.name,
+          businessType: data.constitution || prev.businessType,
+          pan: data.pan || prev.pan,
+          address: data.address || prev.address,
+          city: data.city || prev.city,
+          state: data.state || prev.state,
+          stateCode: data.stateCode || prev.stateCode,
+          pincode: data.pincode || prev.pincode
+        }));
+
+        if (hasLiveName && hasLiveAddress) {
+          setGstFeedback({
+            message: `✓ Live Verified: ${data.tradeName || data.legalName} (${data.status})`,
+            error: false
+          });
+        } else if (hasLiveName) {
+          setGstFeedback({
+            message: `✓ Verified: ${data.tradeName || data.legalName} (${data.state}). Enter specific address below.`,
+            error: false
+          });
+        } else {
+          setGstFeedback({
+            message: `✓ State (${data.state}) & PAN verified. Add GST_API_KEY in .env for live registered name & building address.`,
+            error: false
+          });
+        }
+        setTimeout(() => setGstFeedback({ message: '', error: false }), 8000);
+      } else {
+        setGstFeedback({ message: data?.message || 'GSTIN details not found', error: true });
+      }
+    } catch (err) {
+      setGstFeedback({ message: err.message || 'Could not fetch GST details', error: true });
+    } finally {
+      setGstLoading(false);
+    }
+  };
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -135,29 +202,73 @@ export default function SettingsPage({ business = {}, onUpdateBusiness }) {
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-semibold" 
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">GSTIN Number</label>
-                  <input 
-                    type="text" 
-                    value={form.gstin}
-                    onChange={(e) => {
-                      const val = e.target.value.toUpperCase();
-                      const parsed = parseGSTIN(val);
-                      setForm(prev => ({
-                        ...prev,
-                        gstin: val,
-                        ...(parsed.stateCode ? { stateCode: parsed.stateCode, state: parsed.state } : {})
-                      }));
-                    }}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono uppercase font-bold text-slate-900" 
-                  />
+                <div className="sm:col-span-2 bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="block font-bold text-slate-900">
+                      GSTIN Number (Goods & Services Tax Identification Number)
+                    </label>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Enter 15-character GSTIN to auto-fetch business name, PAN, and address
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input 
+                        type="text" 
+                        placeholder="e.g. 29ABCDE1234F1ZH"
+                        maxLength={15}
+                        value={form.gstin}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '');
+                          const parsed = parseGSTIN(val);
+                          setForm(prev => ({
+                            ...prev,
+                            gstin: val,
+                            ...(parsed.stateCode ? { stateCode: parsed.stateCode, state: parsed.state } : {})
+                          }));
+                          if (val.length === 15) {
+                            handleGSTFetch(val);
+                          }
+                        }}
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono uppercase font-bold text-slate-900 bg-white tracking-wider text-sm focus:ring-2 focus:ring-mint-500 focus:outline-none" 
+                      />
+                      {gstLoading && (
+                        <div className="absolute right-3 top-3 text-mint-600 animate-spin">
+                          <Loader2 className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleGSTFetch(form.gstin)}
+                      disabled={gstLoading || form.gstin.length !== 15}
+                      className="px-4 py-2.5 bg-mint-600 hover:bg-mint-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all shrink-0"
+                    >
+                      {gstLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      <span>Auto-fetch Details</span>
+                    </button>
+                  </div>
+
+                  {gstFeedback.message && (
+                    <div className={`p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 ${
+                      gstFeedback.error ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    }`}>
+                      {!gstFeedback.error && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />}
+                      <span>{gstFeedback.message}</span>
+                    </div>
+                  )}
                 </div>
+
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">PAN Number</label>
                   <input 
                     type="text" 
+                    placeholder="e.g. ABCDE1234F"
+                    maxLength={10}
                     value={form.pan}
-                    onChange={(e) => setForm({ ...form, pan: e.target.value.toUpperCase() })}
+                    onChange={(e) => setForm({ ...form, pan: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '') })}
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono uppercase font-bold text-slate-900" 
                   />
                 </div>

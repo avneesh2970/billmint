@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, ArrowRight, CheckCircle2, Building, Receipt, Sparkles } from 'lucide-react';
+import { FileText, ArrowRight, CheckCircle2, Building, Receipt, Sparkles, Loader2 } from 'lucide-react';
 import { apiRequest } from '../services/api';
+import { fetchGSTDetails } from '../services/gst';
+import { parseGSTIN } from '../../../../packages/shared-utils/index.js';
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
@@ -14,6 +16,8 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [gstLoading, setGstLoading] = useState(false);
+  const [gstFeedback, setGstFeedback] = useState({ message: '', error: false });
 
   const [businessInfo, setBusinessInfo] = useState({
     name: storedUser.fullName ? `${storedUser.fullName}'s Business` : '',
@@ -21,6 +25,7 @@ export default function OnboardingPage() {
     address: '',
     city: '',
     state: '',
+    stateCode: '',
     pincode: '',
     country: 'India',
     phone: '',
@@ -34,6 +39,52 @@ export default function OnboardingPage() {
     taxType: 'GST',
     defaultTaxRate: '18'
   });
+
+  const handleGSTFetch = async (gstinVal) => {
+    const clean = (gstinVal || taxInfo.gstin || '').trim().toUpperCase();
+    if (clean.length !== 15) return;
+    setGstLoading(true);
+    setGstFeedback({ message: 'Fetching verified business details from GST Portal...', error: false });
+    try {
+      const data = await fetchGSTDetails(clean);
+      if (data && data.success) {
+        setBusinessInfo(prev => ({
+          ...prev,
+          name: data.tradeName || data.legalName || prev.name,
+          businessType: data.constitution || prev.businessType,
+          address: data.address || prev.address,
+          city: data.city || prev.city,
+          state: data.state || prev.state,
+          stateCode: data.stateCode || prev.stateCode,
+          pincode: data.pincode || prev.pincode
+        }));
+        setTaxInfo(prev => ({
+          ...prev,
+          gstin: clean,
+          pan: data.pan || prev.pan
+        }));
+        const hasLiveName = Boolean(data.tradeName || data.legalName);
+        if (hasLiveName) {
+          setGstFeedback({
+            message: `✓ Live Verified: ${data.tradeName || data.legalName} (${data.status})`,
+            error: false
+          });
+        } else {
+          setGstFeedback({
+            message: `✓ State (${data.state}) & PAN verified. Enter business name & street address below.`,
+            error: false
+          });
+        }
+        setTimeout(() => setGstFeedback({ message: '', error: false }), 8000);
+      } else {
+        setGstFeedback({ message: data?.message || 'GSTIN details not found', error: true });
+      }
+    } catch (err) {
+      setGstFeedback({ message: err.message || 'Could not fetch GST details', error: true });
+    } finally {
+      setGstLoading(false);
+    }
+  };
 
   const handleFinish = async () => {
     setSaving(true);
@@ -124,6 +175,57 @@ export default function OnboardingPage() {
             </div>
             <p className="text-xs text-slate-500">This information will appear on all your invoices.</p>
 
+            {/* Quick Auto-Fill with GSTIN */}
+            <div className="bg-mint-50/70 border border-mint-200/80 rounded-2xl p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-mint-950 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-mint-600" />
+                  Have a GSTIN? Auto-Fill All Details
+                </span>
+                <span className="text-[10px] text-mint-700">Instant verification</span>
+              </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    placeholder="Enter 15-character GSTIN (e.g. 29ABCDE1234F1ZH)"
+                    maxLength={15}
+                    value={taxInfo.gstin}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '');
+                      setTaxInfo(prev => ({ ...prev, gstin: val }));
+                      if (val.length === 15) {
+                        handleGSTFetch(val);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-mint-200 rounded-xl uppercase font-mono text-xs font-bold text-slate-900 bg-white tracking-wider focus:ring-2 focus:ring-mint-500 focus:outline-none"
+                  />
+                  {gstLoading && (
+                    <div className="absolute right-2.5 top-2.5 text-mint-600 animate-spin">
+                      <Loader2 className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleGSTFetch(taxInfo.gstin)}
+                  disabled={gstLoading || taxInfo.gstin.length !== 15}
+                  className="px-4 py-2 bg-mint-600 hover:bg-mint-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all shrink-0"
+                >
+                  {gstLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  <span>Auto-fill</span>
+                </button>
+              </div>
+              {gstFeedback.message && (
+                <div className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 ${
+                  gstFeedback.error ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                }`}>
+                  {!gstFeedback.error && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                  <span>{gstFeedback.message}</span>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {field('Business Name *', 'name', 'text', businessInfo, setBusinessInfo, 'e.g. Sharma Enterprises')}
               {field('Business Type', 'businessType', 'text', businessInfo, setBusinessInfo, 'e.g. Freelancer, Agency, Retailer')}
@@ -164,9 +266,73 @@ export default function OnboardingPage() {
             </div>
             <p className="text-xs text-slate-500">These are optional — you can fill them later in Settings.</p>
 
+            {/* GSTIN with Auto-Fetch */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <label className="block text-xs font-bold text-slate-800">
+                  GSTIN Number (Optional)
+                </label>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  Enter 15-character GSTIN to auto-fetch details
+                </span>
+              </div>
+
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 29ABCDE1234F1ZH"
+                    maxLength={15}
+                    value={taxInfo.gstin}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '');
+                      setTaxInfo(prev => ({ ...prev, gstin: val }));
+                      if (val.length === 15) {
+                        handleGSTFetch(val);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl uppercase font-mono text-xs font-bold text-slate-900 bg-white tracking-wider focus:ring-2 focus:ring-mint-500 focus:outline-none"
+                  />
+                  {gstLoading && (
+                    <div className="absolute right-2.5 top-2.5 text-mint-600 animate-spin">
+                      <Loader2 className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleGSTFetch(taxInfo.gstin)}
+                  disabled={gstLoading || taxInfo.gstin.length !== 15}
+                  className="px-3 py-2 bg-mint-600 hover:bg-mint-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all shrink-0"
+                >
+                  {gstLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  <span>Auto-fetch</span>
+                </button>
+              </div>
+
+              {gstFeedback.message && (
+                <div className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 ${
+                  gstFeedback.error ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                }`}>
+                  {!gstFeedback.error && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                  <span>{gstFeedback.message}</span>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {field('GSTIN Number (Optional)', 'gstin', 'text', taxInfo, setTaxInfo, '29ABCDE1234F1ZH')}
-              {field('PAN Number (Optional)', 'pan', 'text', taxInfo, setTaxInfo, 'ABCDE1234F')}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">PAN Number (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="ABCDE1234F"
+                  maxLength={10}
+                  value={taxInfo.pan}
+                  onChange={(e) => setTaxInfo(prev => ({ ...prev, pan: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '') }))}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-mint-500 focus:outline-none text-sm font-mono uppercase font-bold text-slate-900"
+                />
+              </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Tax System</label>
                 <select

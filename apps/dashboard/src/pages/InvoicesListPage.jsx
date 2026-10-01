@@ -46,15 +46,15 @@ export default function InvoicesListPage({
   }, 0);
   const totalPending = totalInvoiced - totalPaid;
 
-  const handleDownloadPDF = (inv) => {
+  const handleDownloadPDF = async (inv) => {
     const cust = customers.find(c => c.id === inv.customerId);
-    const pdf = generateInvoicePDF(inv, business, cust, inv.template || 'Modern');
+    const pdf = await generateInvoicePDF(inv, business, cust, inv.template || 'Modern');
     pdf.save(`${inv.invoiceNumber}.pdf`);
   };
 
-  const handlePrint = (inv) => {
+  const handlePrint = async (inv) => {
     const cust = customers.find(c => c.id === inv.customerId);
-    const pdf = generateInvoicePDF(inv, business, cust, inv.template || 'Modern');
+    const pdf = await generateInvoicePDF(inv, business, cust, inv.template || 'Modern');
     pdf.autoPrint();
     window.open(pdf.output('bloburl'), '_blank');
   };

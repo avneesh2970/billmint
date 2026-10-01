@@ -35,7 +35,12 @@ const invoiceSchema = new mongoose.Schema({
   status: { type: String, default: 'Pending' },
   notes: { type: String, default: '' },
   terms: { type: String, default: '' },
-  template: { type: String, default: 'Modern' }
+  template: { type: String, default: 'Modern' },
+  isEInvoice: { type: Boolean, default: false },
+  irn: { type: String, default: '' },
+  ackNo: { type: String, default: '' },
+  ackDate: { type: String, default: '' },
+  eWayBillNo: { type: String, default: '' }
 }, { timestamps: true });
 
 export const Invoice = mongoose.model('Invoice', invoiceSchema);

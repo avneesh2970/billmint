@@ -332,6 +332,7 @@ export default function App() {
                 business={business} 
                 customers={customers}
                 onRecordPayment={handleRecordPayment}
+                onUpdateInvoice={handleSaveInvoice}
               />
             } 
           />
